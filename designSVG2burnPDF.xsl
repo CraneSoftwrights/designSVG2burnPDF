@@ -108,7 +108,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 <xs:key>
   <para>Find all layers that are building blocks</para>
 </xs:key>
-<xsl:key name="c:build" match="g[matches(@inkscape:label,':[^\*]')]"
+<xsl:key name="c:build"
+         match="g[@inkscape:groupmode='layer']
+                 [matches(@inkscape:label,':[^\*]')]"
          use="'__all__',
               for $each in tokenize(@inkscape:label,'\s+')[matches(.,':[^\*]')]
               return substring-before($each,':')"/>
@@ -117,7 +119,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <para>Find all layers that are assembled building blocks</para>
 </xs:key>
 <xsl:key name="c:assemble" use="'__all__',tokenize(@inkscape:label,'\s+')[1]"
-         match="/*/g[tokenize(@inkscape:label,'\s+')[starts-with(.,'=')]]"/>
+         match="g[@inkscape:groupmode='layer']
+                 [tokenize(@inkscape:label,'\s+')[starts-with(.,'=')]]"/>
 
 <xs:key>
   <para>Find all objects based on their label</para>
