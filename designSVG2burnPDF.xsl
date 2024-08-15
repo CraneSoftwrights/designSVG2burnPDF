@@ -106,14 +106,22 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 </xs:doc>
 
 <xs:key>
-  <para>Find all layers that are building blocks</para>
+  <para>Find some layers that are building blocks</para>
 </xs:key>
 <xsl:key name="c:build"
          match="g[@inkscape:groupmode='layer']
-                 [matches(@inkscape:label,':[^\*]')]"
+                 [matches(@inkscape:label,':')]"
          use="'__all__',
-              for $each in tokenize(@inkscape:label,'\s+')[matches(.,':[^\*]')]
+              for $each in tokenize(@inkscape:label,'\s+')[matches(.,':')]
               return substring-before($each,':')"/>
+
+<xs:key>
+  <para>Find more layers that are building blocks</para>
+</xs:key>
+<xsl:key name="c:build"
+         match="g[@inkscape:groupmode='layer']
+                 [starts-with(tokenize(@inkscape:label,'\s+')[2],'=')]"
+         use="tokenize(@inkscape:label,'\s+')[1]"/>
 
 <xs:key>
   <para>Find all layers that are assembled building blocks</para>
@@ -200,6 +208,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
             <xsl:copy>
               <xsl:copy-of select="@*"/>
               <xsl:attribute name="id" select="$c:id"/>
+              <xsl:attribute name="inkscape:label" select="$c:id"/>
               <xsl:attribute name="style"
                              select="'display:inline;',
                                      replace(@style,'display:.+?;?','')"/>
@@ -221,7 +230,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       <xsl:choose>
         <xsl:when test="$c:directive='=#'"><!--this is a collage-->
           <xsl:for-each select="$c:tokens[starts-with(.,'#')]">
-<xsl:text/>select-by-id:<xsl:value-of select="replace(.,'^#?(.+?):.*$','$1')"
+<xsl:text/>select-by-id:<xsl:value-of select="replace(.,'^#?(.+?)$','$1')"
                                          />;page-fit-to-selection;select-clear;  
 <xsl:text/>
           </xsl:for-each>
@@ -318,15 +327,12 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
   <xsl:variable name="c:labelTokens" 
       select="c:disambiguateTokens(tokenize($c:layer/@inkscape:label,'\s+'))"/>
   <!--the output layer uses the given name-->
-    <xsl:for-each select="reverse($c:labelTokens[contains(.,':')])">
-      <!--the entire string before the colon is unique and disambiguated-->
-      <xsl:variable name="c:uniqueRef"
-                    select="replace(.,'^#?(.+?):.*$','$1')"/>
+    <xsl:for-each select="reverse($c:labelTokens[position()>2])">
       <!--tease out the authored reference before it was disambiguated-->
       <xsl:variable name="c:ref"
-                    select="replace(.,'^#?(.+?)(____\d+)?:.*$','$1')"/>
+                    select="replace(.,'^#?(.+?)(____\d+)?$','$1')"/>
       <!--label the group uniquely, but populate the group as authored-->
-      <g inkscape:label="{$c:uniqueRef}" id="{$c:uniqueRef}">
+      <g inkscape:label="{$c:ref}" id="{$c:ref}">
         <xsl:choose>
           <xsl:when test="some $c:past in $c:pastLayers
                           satisfies $c:past is $c:layer">
@@ -416,9 +422,9 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
     <xsl:choose>
       <xsl:when test=". = $c:inputs[position() &lt; $c:disambiguatePosition]">
         <!--this is a duplicate, so disambiguate-->
-        <xsl:sequence select="replace(.,':',concat('____',
+        <xsl:sequence select="concat(.,'____',
                        count($c:inputs[position() &lt; $c:disambiguatePosition]
-                                      [. = current()]) + 1,':'))"/>
+                                      [. = current()]) + 1)"/>
       </xsl:when>
       <xsl:otherwise>
         <xsl:sequence select="."/>
