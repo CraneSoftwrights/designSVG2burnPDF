@@ -174,7 +174,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           <xsl:variable name="c:refs" 
                         select="tokenize(@inkscape:label,'\s+')"/>
           <!--the output layer uses the given name-->
-          <g inkscape:label="{$c:refs[1]}" id="{$c:refs[1]}"
+          <g inkscape:label="{@inkscape:label}" id="{$c:refs[1]}"
              style="display:none">
             <xsl:call-template name="c:addReferencedLayers">
               <xsl:with-param name="c:layer" select="."/>
@@ -208,7 +208,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
             <xsl:copy>
               <xsl:copy-of select="@*"/>
               <xsl:attribute name="id" select="$c:id"/>
-              <xsl:attribute name="inkscape:label" select="$c:id"/>
               <xsl:attribute name="style"
                              select="'display:inline;',
                                      replace(@style,'display:.+?;?','')"/>
@@ -329,10 +328,12 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
   <!--the output layer uses the given name-->
     <xsl:for-each select="reverse($c:labelTokens[position()>2])">
       <!--tease out the authored reference before it was disambiguated-->
+      <xsl:variable name="c:disambiguated"
+                    select="replace(.,'^#','')"/>
       <xsl:variable name="c:ref"
                     select="replace(.,'^#?(.+?)(____\d+)?$','$1')"/>
-      <!--label the group uniquely, but populate the group as authored-->
-      <g inkscape:label="{$c:ref}" id="{$c:ref}">
+      <!--label group as disambiguated, but populate the group as authored-->
+      <g inkscape:label="{$c:disambiguated}" id="{$c:disambiguated}">
         <xsl:choose>
           <xsl:when test="some $c:past in $c:pastLayers
                           satisfies $c:past is $c:layer">
