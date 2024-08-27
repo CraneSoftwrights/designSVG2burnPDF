@@ -95,6 +95,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 </xs:param>
 <xsl:param name="name-suffix" as="xsd:string" required="yes"/>
 
+<xs:param>
+  <para>
+    The colour assumed to be modified into a cutting stroke.
+  </para>
+</xs:param>
+<xsl:param name="cut-colour" as="xsd:string" select="'ff00ff'"/>
+
 <xs:variable>
   <para>Need to remember the input context for key() to work</para>
 </xs:variable>
@@ -178,6 +185,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       </xsl:call-template>
     </xsl:for-each>
   </xsl:variable>
+  
+  <!--check for anything close to burn size that isn't expressly cut colour-->
+  
+  <!--bail if any such problems-->
   <xsl:if test="exists($c:analysisStrings)">
     <xsl:message terminate="yes"
                  select="string-join($c:analysisStrings,'&#xa;')"/>
@@ -446,7 +457,7 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
     <para>Indication that a review copy is being created</para>
   </xs:param>
 </xs:template>
-<xsl:template match="@style[contains(.,'stroke:#ff00ff')]">
+<xsl:template match="@style[contains(.,concat('stroke:#',$cut-colour))]">
   <xsl:param name="c:review" as="xsd:boolean" tunnel="yes" select="false()"/>
   <xsl:choose>
     <xsl:when test="$c:review">
