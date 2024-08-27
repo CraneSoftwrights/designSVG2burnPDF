@@ -109,8 +109,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <para>Find some layers that are building blocks</para>
 </xs:key>
 <xsl:key name="c:build"
-         match="g[@inkscape:groupmode='layer']
-                 [matches(@inkscape:label,':')]"
+         match="g[matches(@inkscape:label,':')]"
          use="'__all__',
               for $each in tokenize(@inkscape:label,'\s+')[matches(.,':')]
               return substring-before($each,':')"/>
@@ -119,15 +118,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <para>Find more layers that are building blocks</para>
 </xs:key>
 <xsl:key name="c:build"
-         match="g[@inkscape:groupmode='layer']
-                 [starts-with(tokenize(@inkscape:label,'\s+')[2],'=')]"
-         use="tokenize(@inkscape:label,'\s+')[1]"/>
+         match="g[starts-with(tokenize(@inkscape:label,'\s+')[2],'=')]"
+         use="'__all__',
+              tokenize(@inkscape:label,'\s+')[1]"/>
 
 <xs:key>
   <para>Find all layers that are assembled building blocks</para>
 </xs:key>
 <xsl:key name="c:assemble" use="'__all__',tokenize(@inkscape:label,'\s+')[1]"
-         match="g[@inkscape:groupmode='layer']
+         match="g[not(ancestor-or-self::*[contains(@style,'display:none')])]
                  [tokenize(@inkscape:label,'\s+')[starts-with(.,'=')]]"/>
 
 <xs:key>
@@ -135,6 +134,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 </xs:key>
 <xsl:key name="c:objectsByLabel" match="*[@inkscape:label]"
          use="normalize-space(@inkscape:label)"/>
+
+<xs:key>
+  <para>All ids</para>
+</xs:key>
+<xsl:key name="c:objectsById" match="*[@id]" use="normalize-space(@id)"/>
 
 <xs:template>
   <para>
@@ -150,15 +154,35 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <para>Get started</para>
 </xs:template>
 <xsl:template match="/svg" priority="1">
-  <!--integrity check on version strings-->
+  <!--in support of the integrity check on version strings-->
   <xsl:variable name="c:printVersionStrings"
                 select="key('c:objectsByLabel','Version')/
                         replace(.,'[\s-:]','')"/>
-  <xsl:if test="count(distinct-values($c:printVersionStrings))>1">
+
+  <!--other integrity checks-->
+  <xsl:variable name="c:analysisStrings" as="xsd:string*">
+    <!--If multiple version strings, they must all be the same-->
+    <xsl:if test="count(distinct-values($c:printVersionStrings))>1">
+      <xsl:value-of select="'Inconsistent version strings:',
+                           distinct-values($c:printVersionStrings),
+                           'at locations:',
+       string-join( key('c:objectsByLabel','Version')/c:labelPath(.), '; ' )"/>
+    </xsl:if>
+    
+    <!--If no or multiple ids being referenced, cannot guess which to use-->
+    <xsl:for-each select="key('c:assemble','__all__',$c:top)">
+      <xsl:variable name="c:refs" select="tokenize(@inkscape:label,'\s+')"/>
+      <xsl:call-template name="c:checkReferencedLayers">
+        <xsl:with-param name="c:layer" select="."/>
+        <xsl:with-param name="c:review" tunnel="yes" select="true()"/>
+      </xsl:call-template>
+    </xsl:for-each>
+  </xsl:variable>
+  <xsl:if test="exists($c:analysisStrings)">
     <xsl:message terminate="yes"
-                 select="'Inconsistent version strings:',
-                         distinct-values($c:printVersionStrings)"/>
+                 select="string-join($c:analysisStrings,'&#xa;')"/>
   </xsl:if>
+
   <!--create reivew SVG file of all layers-->
   <xsl:result-document href="{$path2svg}review-all-burns{$name-suffix}.svg"
                        method="xml" indent="no">
@@ -310,9 +334,9 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
         $path2svg,$c:id,$name-suffix,".svg.txt""&#xa;")'/>
   </xsl:for-each>
 </xsl:template>
-
+  
 <xs:template>
-  <para>Recursively copy in referenced groups, checking for loops</para>
+  <para>Prevalidate and report problems in building, checking for loops</para>
   <xs:param name="c:layer">
     <para>The layer making the references</para>
   </xs:param>
@@ -320,9 +344,66 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
     <para>A history of layers to prevent infinite loops and visibility</para>
   </xs:param>
 </xs:template>
-<xsl:template name="c:addReferencedLayers">
+<xsl:template name="c:checkReferencedLayers">
   <xsl:param name="c:layer" as="element(g)" required="yes"/>
   <xsl:param name="c:pastLayers" as="element(g)*"/>
+  <xsl:variable name="c:labelTokens" 
+      select="c:disambiguateTokens(tokenize($c:layer/@inkscape:label,'\s+'))"/>
+  <!--the output layer uses the given name-->
+    <xsl:for-each select="reverse($c:labelTokens[position()>2])">
+      <!--tease out the authored reference before it was disambiguated-->
+      <xsl:variable name="c:disambiguated"
+                    select="replace(.,'^#','')"/>
+      <xsl:variable name="c:ref"
+                    select="replace(.,'^#?(.+?)(____\d+)?$','$1')"/>
+      <xsl:choose>
+        <xsl:when test="some $c:past in $c:pastLayers
+                        satisfies $c:past is $c:layer">
+          <!--this is an infinite loop-->
+          <xsl:value-of>
+            <xsl:text>An infinite loop detected with:&#xa;</xsl:text>
+            <xsl:for-each select="$c:pastLayers">
+              <xsl:value-of select="string-join($c:pastLayers/c:labelPath(.),
+                                                '; ')"/>
+            </xsl:for-each>
+          </xsl:value-of>
+        </xsl:when>
+        <xsl:when test="count(key('c:assemble',$c:ref,$c:top))>1">
+          <!--something is amiss-->
+          <xsl:value-of>
+         <xsl:text>Multiple definitions for the assembly reference: </xsl:text>
+            <xsl:value-of select="$c:ref"/>
+          </xsl:value-of>
+        </xsl:when>
+        <xsl:when test="exists(key('c:assemble',$c:ref,$c:top))">
+          <xsl:call-template name="c:checkReferencedLayers">
+            <xsl:with-param name="c:layer"
+                            select="key('c:assemble',$c:ref,$c:top)"/>
+            <xsl:with-param name="c:pastLayers"
+                            select="$c:pastLayers,$c:layer"/>
+          </xsl:call-template>
+        </xsl:when>
+        <xsl:when test="empty(key('c:build',$c:ref,$c:top))">
+          <!--something is amiss-->
+          <xsl:value-of>
+            <xsl:text>Missing a definition for the reference: </xsl:text>
+            <xsl:value-of select="$c:ref"/>
+            <xsl:text> at </xsl:text>
+            <xsl:value-of select="c:labelPath($c:layer)"/>
+          </xsl:value-of>
+        </xsl:when>
+      </xsl:choose>
+    </xsl:for-each>
+</xsl:template>
+
+<xs:template>
+  <para>Recursively copy in referenced groups, assuming pre-checked</para>
+  <xs:param name="c:layer">
+    <para>The layer making the references</para>
+  </xs:param>
+</xs:template>
+<xsl:template name="c:addReferencedLayers">
+  <xsl:param name="c:layer" as="element(g)" required="yes"/>
   <xsl:variable name="c:labelTokens" 
       select="c:disambiguateTokens(tokenize($c:layer/@inkscape:label,'\s+'))"/>
   <!--the output layer uses the given name-->
@@ -335,30 +416,11 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
       <!--label group as disambiguated, but populate the group as authored-->
       <g inkscape:label="{$c:disambiguated}" id="{$c:disambiguated}">
         <xsl:choose>
-          <xsl:when test="some $c:past in $c:pastLayers
-                          satisfies $c:past is $c:layer">
-            <!--this is an infinite loop-->
-            <xsl:message terminate="yes">
-              <xsl:text>An infinite loop detected with:&#xa;</xsl:text>
-              <xsl:for-each select="$c:pastLayers">
-                <xsl:value-of select="@inkscape:label,'&#xa;'"/>
-              </xsl:for-each>
-            </xsl:message>
-          </xsl:when>
           <xsl:when test="exists(key('c:assemble',$c:ref,$c:top))">
             <xsl:call-template name="c:addReferencedLayers">
               <xsl:with-param name="c:layer"
                               select="key('c:assemble',$c:ref,$c:top)"/>
-              <xsl:with-param name="c:pastLayers"
-                              select="$c:pastLayers,$c:layer"/>
             </xsl:call-template>
-          </xsl:when>
-          <xsl:when test="empty(key('c:build',$c:ref,$c:top))">
-            <!--something is amiss-->
-            <xsl:message terminate="yes">
-              <xsl:text>Missing a definition for the reference: </xsl:text>
-              <xsl:value-of select="$c:ref"/>
-            </xsl:message>
           </xsl:when>
           <xsl:otherwise>
             <xsl:for-each select="key('c:build',$c:ref,$c:top)">
@@ -433,4 +495,26 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
     </xsl:choose>
   </xsl:for-each>
 </xsl:function>
+
+<xs:function>
+  <para>Report the hierarchy of labels including and above the given</para>
+  <xs:param name="c:context">
+    <para>Where to start from</para>
+  </xs:param>
+</xs:function>
+<xsl:function name="c:labelPath" as="xsd:string">
+  <xsl:param name="c:context" as="element()"/>
+  <xsl:value-of>
+    <xsl:for-each select="($c:context/ancestor-or-self::*[@inkscape:label])">
+      <xsl:text>&#xa;</xsl:text>
+      <xsl:for-each select="1 to position()">
+        <xsl:text>  </xsl:text>
+      </xsl:for-each>
+      <xsl:text/>"<xsl:value-of select="@inkscape:label"/>"<xsl:text/>
+      <xsl:for-each select="@id">{<xsl:value-of select="."/>}</xsl:for-each>
+      <xsl:if test="position()!=last()">/</xsl:if>
+    </xsl:for-each>
+  </xsl:value-of>
+</xsl:function>
+
 </xsl:stylesheet>
