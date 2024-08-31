@@ -4,9 +4,10 @@
                 xmlns:xs="http://www.CraneSoftwrights.com/ns/xslstyle"
                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"
                 xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+                xmlns:math="http://www.w3.org/2005/xpath-functions/math"
                 xmlns="http://www.w3.org/2000/svg"
                 xmlns:c="urn:X-Crane"
-                exclude-result-prefixes="xs xsd c"
+                exclude-result-prefixes="xs xsd c math"
                 xpath-default-namespace="http://www.w3.org/2000/svg"
                 version="2.0">
 
@@ -152,13 +153,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     Determine in inches the unit of measure of non-unit-specified values
   </para>
 </xs:variable>
-<xsl:variable name="c:nonUnitInches" as="xsd:decimal">
-  <xsl:variable name="c:pageWidthInInches" as="xsd:decimal"
+<xsl:variable name="c:nonUnitInches" as="xsd:double">
+  <xsl:variable name="c:pageWidthInInches" as="xsd:double"
                 select="c:lengthInInchesDefaultPX(/svg/@width)"/>
-  <xsl:variable name="c:viewWidth" as="xsd:decimal"
+  <xsl:variable name="c:viewWidth" as="xsd:double"
                 select="for $c:width in replace(/svg/@viewBox,
                     '\s*([-.\d]+)\s*([-.\d]+)\s*([-.\d]+)\s*([-.\d]+)\s*','$3')
-                        return $c:width cast as xsd:decimal"/>
+                        return $c:width cast as xsd:double"/>
   <xsl:sequence select="$c:pageWidthInInches div $c:viewWidth"/>
 </xsl:variable>
 
@@ -184,12 +185,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <xsl:message select="'DEBUG length 1cm',c:lengthInDefault('1cm')"/>
   <xsl:message select="'DEBUG length 1mm',c:lengthInDefault('1mm')"/>
   <xsl:message select="'DEBUG length  1 def',c:lengthInDefault('1')"/>
+  <xsl:message select="c:determineStrokeScalingFactor(())"/>
+  <xsl:message select="c:determineStrokeScalingFactor('matrix(1,1,1,1,0,0)')"/>
+  <xsl:message select="c:determineStrokeScalingFactor('
+matrix(-0.10215694,0.10215694,-0.10214641,-0.10214641,282.66397,204.85245)')"/>
+  <xsl:message select="c:determineStrokeScalingFactor('scale(1)')"/>
+  <xsl:message select="c:determineStrokeScalingFactor('scale(1,1)')"/>
+  <xsl:message select="c:determineStrokeScalingFactor('scale(2,3)')"/>
   -->
-  <!--in support of the integrity check on version strings-->
-  <xsl:variable name="c:printVersionStrings"
-                select="key('c:objectsByLabel','Version')/
-                        replace(.,'[\s-:]','')"/>
-
   <!--where are all the images?-->
   <!--<xsl:message terminate="yes">
     <xsl:for-each select="//image">
@@ -198,6 +201,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       <xsl:value-of select="c:labelPath(.)"/>
     </xsl:for-each>
   </xsl:message>-->
+  
+
+  <!--in support of the integrity check on version strings-->
+  <xsl:variable name="c:printVersionStrings"
+                select="key('c:objectsByLabel','Version')/
+                        replace(.,'[\s-:]','')"/>
 
   <!--other integrity checks-->
   <xsl:variable name="c:analysisStrings" as="xsd:string*">
@@ -230,32 +239,30 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
            select="replace(@style,'.*?stroke-width:([\d\.\-]+)\w*;?.*','$1')"/>
       <xsl:variable name="c:normalizedWidthInInches"
                     select="c:lengthInInches($c:strokeWidth)"/>
-      
-      <xsl:if test="@inkscape:label='Number BAD'">
-        <xsl:message select="'DEBUG BAD:',$c:strokeWidth,$c:strokeWidthLength,$c:strokeColour, $c:normalizedWidthInInches"/>
-      </xsl:if>
-      
+      <xsl:variable name="c:scaledWidthInInches"
+                    select="c:determineStrokeScalingFactor(@transform) *
+                            $c:normalizedWidthInInches"/>
       
       <xsl:choose>
-        <xsl:when test="not( $c:strokeWidthLength castable as xsd:decimal )">
+        <xsl:when test="not( $c:strokeWidthLength castable as xsd:double )">
           <xsl:value-of select="concat('Unexpected stroke specification ''',
                                        $c:strokeWidth,''' ',
                                        c:labelPath(.),' = ',$c:strokeWidth)"/>
         </xsl:when>
-        <xsl:when test="$c:normalizedWidthInInches cast as xsd:decimal
-                        &lt; .0005">
+        <xsl:when test="$c:scaledWidthInInches &lt; .00005">
           <!--don't treat as a problem; the stroke isn't visible-->
         </xsl:when>
         <xsl:when test="$c:strokeColour = $cut-colour">
           <!--don't treat as a problem; the stroke will get converted-->
         </xsl:when>
         <xsl:otherwise>
-          <xsl:if test="$c:normalizedWidthInInches &lt; .003 and
+          <xsl:if test="$c:scaledWidthInInches &lt; .003 and
                         $c:strokeColour != $cut-colour">
             <xsl:value-of>
               <xsl:value-of select="'Rogue cutting stroke detected at',
-                                    $c:normalizedWidthInInches,'inches',
-                                    c:labelPath(.),'=',$c:strokeWidth,'colour',
+                                    $c:scaledWidthInInches,'inches',
+                                    c:labelPath(.),'=',$c:strokeWidth,
+                                    @transform,'colour',
                                     $c:strokeColour"/>
             </xsl:value-of>
           </xsl:if>
@@ -271,9 +278,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
                                     concat(count($c:analysisStrings),
                                            ' reports to be fixed')),'&#xa;')"/>
   </xsl:if>
-  <!--======================================================-->d
+  
+  <!--======================================================-->
 
-  <!--create reivew SVG file of all layers-->
+  <!--create review SVG file of all layers-->
   <xsl:result-document href="{$path2svg}review-all-burns{$name-suffix}.svg"
                        method="xml" indent="no">
     <xsl:copy>
@@ -299,6 +307,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       </g>
     </xsl:copy>
   </xsl:result-document>
+  
+  <!--======================================================-->
+
   <!--create individual SVG files for each layer-->
   <xsl:for-each select="key('c:assemble','__all__',$c:top)">
     <xsl:variable name="c:thisAssembly" select="."/>
@@ -333,6 +344,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         </xsl:copy>
       </xsl:for-each>
     </xsl:result-document>
+
+    <!--======================================================-->
+
     <!--create the Inkscape actions file for the target layer-->
     <xsl:result-document href="{$path2svg}{$c:id}{$name-suffix}.svg.txt"
                          method="text">
@@ -415,6 +429,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
     </xsl:result-document>
   </xsl:for-each>
+  
+  <!--======================================================-->
+  
   <!--put out the script that invokes inkscape to the standard output-->
   <xsl:for-each select="key('c:assemble','__all__',$c:top)">
     <xsl:variable name="c:id" select="tokenize(@inkscape:label,'\s+')[1]"/>
@@ -425,6 +442,11 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
   </xsl:for-each>
 </xsl:template>
   
+<!--========================================================================-->
+<xs:doc>
+  <xs:title>Walking around the various layers</xs:title>
+</xs:doc>
+
 <xs:template>
   <para>Prevalidate and report problems in building, checking for loops</para>
   <xs:param name="c:layer">
@@ -528,6 +550,36 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
     </xsl:for-each>
 </xsl:template>
 
+<xs:function>
+  <para>Disambiguate a string of token values ahead of a colon</para>
+  <xs:param name="c:inputs">
+    <para>The set of tokens to be disambiguated</para>
+  </xs:param>
+</xs:function>
+<xsl:function name="c:disambiguateTokens" as="xsd:string*">
+  <xsl:param name="c:inputs" as="xsd:string*"/>
+  
+  <xsl:for-each select="$c:inputs">
+    <xsl:variable name="c:disambiguatePosition" select="position()"/>
+    <xsl:choose>
+      <xsl:when test=". = $c:inputs[position() &lt; $c:disambiguatePosition]">
+        <!--this is a duplicate, so disambiguate-->
+        <xsl:sequence select="concat(.,'____',
+                       count($c:inputs[position() &lt; $c:disambiguatePosition]
+                                      [. = current()]) + 1)"/>
+      </xsl:when>
+      <xsl:otherwise>
+        <xsl:sequence select="."/>
+      </xsl:otherwise>
+    </xsl:choose>
+  </xsl:for-each>
+</xsl:function>
+
+<!--========================================================================-->
+<xs:doc>
+  <xs:title>Document manipulation</xs:title>
+</xs:doc>
+
 <xs:template>
   <para>
     Convert magenta lines to .001in, but only when creating burn, not review
@@ -562,30 +614,10 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
   </xsl:copy>
 </xsl:template>
 
-<xs:function>
-  <para>Disambiguate a string of token values ahead of a colon</para>
-  <xs:param name="c:inputs">
-    <para>The set of tokens to be disambiguated</para>
-  </xs:param>
-</xs:function>
-<xsl:function name="c:disambiguateTokens" as="xsd:string*">
-  <xsl:param name="c:inputs" as="xsd:string*"/>
-  
-  <xsl:for-each select="$c:inputs">
-    <xsl:variable name="c:disambiguatePosition" select="position()"/>
-    <xsl:choose>
-      <xsl:when test=". = $c:inputs[position() &lt; $c:disambiguatePosition]">
-        <!--this is a duplicate, so disambiguate-->
-        <xsl:sequence select="concat(.,'____',
-                       count($c:inputs[position() &lt; $c:disambiguatePosition]
-                                      [. = current()]) + 1)"/>
-      </xsl:when>
-      <xsl:otherwise>
-        <xsl:sequence select="."/>
-      </xsl:otherwise>
-    </xsl:choose>
-  </xsl:for-each>
-</xsl:function>
+<!--========================================================================-->
+<xs:doc>
+  <xs:title>Utility functions and arithmetic</xs:title>
+</xs:doc>
 
 <xs:function>
   <para>Report the hierarchy of labels including and above the given</para>
@@ -603,7 +635,7 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
       </xsl:for-each>
       <xsl:variable name="c:ref" select="(@inkscape:label,@id)[1]"/>
       <xsl:text/>"<xsl:value-of select="$c:ref"/>"<xsl:text/>
-      <xsl:if test="preceding-sibling::*[(@inkscape:label,@id)[1]=$c:ref]">
+      <xsl:if test="preceding-sibling::*[(@inkscape:ladebel,@id)[1]=$c:ref]">
         <xsl:text/>[<xsl:value-of select="count(preceding-sibling::*
                 [(@inkscape:label,@id)[1]=$c:ref]) + 1"/>]<xsl:text/>
       </xsl:if>
@@ -615,13 +647,71 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
 
 <xs:function>
   <para>
+    Determine a scaling factor from all contributors to scaling found in
+    an element's attributes.
+  </para>
+  <xs:param name="c:transformation">
+    <para>The string of functions applied to </para>
+  </xs:param>
+</xs:function>
+<xsl:function name="c:determineStrokeScalingFactor" as="xsd:double">
+  <xsl:param name="c:transformation" as="xsd:string?"/>
+  
+  <xsl:variable name="c:factors" as="xsd:double*">
+    <!--ensure the sequence of scaling factors is not empty-->
+    <xsl:analyze-string select="$c:transformation" flags="x"
+                        regex="(matrix|scale)\s*\(\s*([\d.-]+)
+ (\s*,\s*([\d.-]+))?(\s*,\s*([\d.-]+))?(\s*,\s*([\d.-]+))?(\s*,\s*([\d.-]+))?">
+      <xsl:matching-substring>
+        <xsl:choose>
+          <xsl:when test="regex-group(1)='scale'">
+            <!--scale(sx)-->
+            <xsl:sequence select="(regex-group(2),'1')[normalize-space(.)][1]
+                                  cast as xsd:double,
+                                  (regex-group(4),'1')[normalize-space(.)][1]
+                                  cast as xsd:double"/>
+          </xsl:when>
+          <xsl:otherwise><!--'matrix-->
+            <xsl:variable name="c:a"
+     select="(regex-group(2),'0')[normalize-space(.)][1] cast as xsd:double"/>
+            <xsl:variable name="c:b"
+     select="(regex-group(4),'0')[normalize-space(.)][1] cast as xsd:double"/>
+            <xsl:variable name="c:c"
+     select="(regex-group(6),'0')[normalize-space(.)][1] cast as xsd:double"/>
+            <xsl:variable name="c:d"
+     select="(regex-group(8),'0')[normalize-space(.)][1] cast as xsd:double"/>
+            <xsl:sequence select="math:sqrt( ($c:a * $c:d) - ($c:b * $c:c) )"/>
+          </xsl:otherwise>
+        </xsl:choose>
+      </xsl:matching-substring>
+    </xsl:analyze-string>
+  </xsl:variable>
+  
+  <xsl:sequence select="c:product($c:factors)"/>
+</xsl:function>
+
+<xs:function>
+  <para>
+    Calculate the product of a sequence of numbers
+  </para>
+  <xs:param name="c:seq">
+    <para>The sequence of numbers being converted</para>
+  </xs:param>
+</xs:function>
+<xsl:function name="c:product" as="xsd:double">
+  <xsl:param name="c:seq" as="xsd:double*"/>
+  <xsl:sequence select="($c:seq[1] * c:product($c:seq[position()>1]),1)[1]"/>
+</xsl:function>
+
+<xs:function>
+  <para>
     Convert a length specification '\d+\w* into a specific number of inches.
   </para>
   <xs:param name="c:length">
     <para>The string being converted</para>
   </xs:param>
 </xs:function>
-<xsl:function name="c:lengthInInchesDefaultPX" as="xsd:decimal?">
+<xsl:function name="c:lengthInInchesDefaultPX" as="xsd:double?">
   <xsl:param name="c:length" as="xsd:string"/>
   <xsl:sequence select="c:lengthInInchesWithDefault($c:length,1 div 96)"/>
 </xsl:function>
@@ -634,7 +724,7 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
     <para>The string being converted</para>
   </xs:param>
 </xs:function>
-<xsl:function name="c:lengthInInches" as="xsd:decimal?">
+<xsl:function name="c:lengthInInches" as="xsd:double?">
   <xsl:param name="c:length" as="xsd:string?"/>
   <xsl:sequence
              select="c:lengthInInchesWithDefault($c:length,$c:nonUnitInches)"/>
@@ -651,12 +741,12 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
     <para>The conversion to use as default when no units specified</para>
   </xs:param>
 </xs:function>
-<xsl:function name="c:lengthInInchesWithDefault" as="xsd:decimal?">
+<xsl:function name="c:lengthInInchesWithDefault" as="xsd:double?">
   <xsl:param name="c:length" as="xsd:string?"/>
-  <xsl:param name="c:defaultConversionToInches" as="xsd:decimal"/>
+  <xsl:param name="c:defaultConversionToInches" as="xsd:double"/>
   <xsl:for-each select="normalize-space($c:length)">
     <xsl:variable name="c:amount" 
-             select="replace(.,'([\d\.\-]+)(\w+)?','$1') cast as xsd:decimal"/>
+             select="replace(.,'([\d\.\-]+)(\w+)?','$1') cast as xsd:double"/>
     <xsl:variable name="c:units" 
              select="replace(.,'([\d\.\-]+)(\w+)?','$2')"/>
     <xsl:variable name="c:normalizedWidthInchesFactor"
@@ -679,11 +769,11 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
     <para>The string being converted</para>
   </xs:param>
 </xs:function>
-<xsl:function name="c:lengthInDefault" as="xsd:decimal?">
+<xsl:function name="c:lengthInDefault" as="xsd:double?">
   <xsl:param name="c:length" as="xsd:string?"/>
   <xsl:for-each select="normalize-space($c:length)">
     <xsl:variable name="c:amount" 
-             select="replace(.,'([\d\.\-]+)(\w+)?','$1') cast as xsd:decimal"/>
+             select="replace(.,'([\d\.\-]+)(\w+)?','$1') cast as xsd:double"/>
     <xsl:variable name="c:units" 
              select="replace(.,'([\d\.\-]+)(\w+)?','$2')"/>
     <xsl:variable name="c:normalizedWidthDefaultFactor"
