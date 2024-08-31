@@ -435,7 +435,7 @@ matrix(-0.10215694,0.10215694,-0.10214641,-0.10214641,282.66397,204.85245)')"/>
   <!--put out the script that invokes inkscape to the standard output-->
   <xsl:for-each select="key('c:assemble','__all__',$c:top)">
     <xsl:variable name="c:id" select="tokenize(@inkscape:label,'\s+')[1]"/>
-echo "<xsl:value-of select="$c:id"/>" - remaining: <xsl:value-of select="last()-position()+1"/>
+echo "<xsl:value-of select="$c:id"/>" - remaining: <xsl:value-of select="last()-position()"/>
 inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
         " --actions-file=""",(: --batch-process slows things down a lot!:)
         $path2svg,$c:id,$name-suffix,".svg.txt""&#xa;")'/>
