@@ -147,6 +147,21 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 </xs:key>
 <xsl:key name="c:objectsById" match="*[@id]" use="normalize-space(@id)"/>
 
+<xs:variable>
+  <para>
+    Determine in inches the unit of measure of non-unit-specified values
+  </para>
+</xs:variable>
+<xsl:variable name="c:nonUnitInches" as="xsd:decimal">
+  <xsl:variable name="c:pageWidthInInches" as="xsd:decimal"
+                select="c:lengthInInchesDefaultPX(/svg/@width)"/>
+  <xsl:variable name="c:viewWidth" as="xsd:decimal"
+                select="for $c:width in replace(/svg/@viewBox,
+                    '\s*([-.\d]+)\s*([-.\d]+)\s*([-.\d]+)\s*([-.\d]+)\s*','$3')
+                        return $c:width cast as xsd:decimal"/>
+  <xsl:sequence select="$c:pageWidthInInches div $c:viewWidth"/>
+</xsl:variable>
+
 <xs:template>
   <para>
     Can't get started
@@ -161,10 +176,28 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <para>Get started</para>
 </xs:template>
 <xsl:template match="/svg" priority="1">
+  <!--Checking the arithmetic:
+  <xsl:message select="'DEBUG nonUnitInches',$c:nonUnitInches"/>
+  <xsl:message select="'DEBUG length .001in',c:lengthInDefault('.001in')"/>
+  <xsl:message select="'DEBUG length 1pc',c:lengthInDefault('1pc')"/>
+  <xsl:message select="'DEBUG length 1in',c:lengthInDefault('1in')"/>
+  <xsl:message select="'DEBUG length 1cm',c:lengthInDefault('1cm')"/>
+  <xsl:message select="'DEBUG length 1mm',c:lengthInDefault('1mm')"/>
+  <xsl:message select="'DEBUG length  1 def',c:lengthInDefault('1')"/>
+  -->
   <!--in support of the integrity check on version strings-->
   <xsl:variable name="c:printVersionStrings"
                 select="key('c:objectsByLabel','Version')/
                         replace(.,'[\s-:]','')"/>
+
+  <!--where are all the images?-->
+  <!--<xsl:message terminate="yes">
+    <xsl:for-each select="//image">
+      <xsl:text>
+    </xsl:text>
+      <xsl:value-of select="c:labelPath(.)"/>
+    </xsl:for-each>
+  </xsl:message>-->
 
   <!--other integrity checks-->
   <xsl:variable name="c:analysisStrings" as="xsd:string*">
@@ -184,15 +217,61 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         <xsl:with-param name="c:review" tunnel="yes" select="true()"/>
       </xsl:call-template>
     </xsl:for-each>
+  
+    <!--check anything close to burn size that isn't expressly cut colour-->
+    <xsl:for-each select="//*[contains(@style,'stroke-width')]
+                             [not(contains(@style,'stroke:none'))] except
+                (//*[contains(@style,'display:none')]/(.,.//*), //defs//*)">
+      <xsl:variable name="c:strokeColour"
+            select="replace(@style,'.*?stroke:#(.+?);?.*','$1')"/>
+      <xsl:variable name="c:strokeWidth" 
+           select="replace(@style,'.*?stroke-width:([\d\.\-]+\w*);?.*','$1')"/>
+      <xsl:variable name="c:strokeWidthLength" 
+           select="replace(@style,'.*?stroke-width:([\d\.\-]+)\w*;?.*','$1')"/>
+      <xsl:variable name="c:normalizedWidthInInches"
+                    select="c:lengthInInches($c:strokeWidth)"/>
+      
+      <xsl:if test="@inkscape:label='Number BAD'">
+        <xsl:message select="'DEBUG BAD:',$c:strokeWidth,$c:strokeWidthLength,$c:strokeColour, $c:normalizedWidthInInches"/>
+      </xsl:if>
+      
+      
+      <xsl:choose>
+        <xsl:when test="not( $c:strokeWidthLength castable as xsd:decimal )">
+          <xsl:value-of select="concat('Unexpected stroke specification ''',
+                                       $c:strokeWidth,''' ',
+                                       c:labelPath(.),' = ',$c:strokeWidth)"/>
+        </xsl:when>
+        <xsl:when test="$c:normalizedWidthInInches cast as xsd:decimal
+                        &lt; .0005">
+          <!--don't treat as a problem; the stroke isn't visible-->
+        </xsl:when>
+        <xsl:when test="$c:strokeColour = $cut-colour">
+          <!--don't treat as a problem; the stroke will get converted-->
+        </xsl:when>
+        <xsl:otherwise>
+          <xsl:if test="$c:normalizedWidthInInches &lt; .003 and
+                        $c:strokeColour != $cut-colour">
+            <xsl:value-of>
+              <xsl:value-of select="'Rogue cutting stroke detected at',
+                                    $c:normalizedWidthInInches,'inches',
+                                    c:labelPath(.),'=',$c:strokeWidth,'colour',
+                                    $c:strokeColour"/>
+            </xsl:value-of>
+          </xsl:if>
+        </xsl:otherwise>
+      </xsl:choose>
+    </xsl:for-each>
+  
   </xsl:variable>
-  
-  <!--check for anything close to burn size that isn't expressly cut colour-->
-  
   <!--bail if any such problems-->
   <xsl:if test="exists($c:analysisStrings)">
     <xsl:message terminate="yes"
-                 select="string-join($c:analysisStrings,'&#xa;')"/>
+                 select="string-join(($c:analysisStrings,
+                                    concat(count($c:analysisStrings),
+                                           ' reports to be fixed')),'&#xa;')"/>
   </xsl:if>
+  <!--======================================================-->d
 
   <!--create reivew SVG file of all layers-->
   <xsl:result-document href="{$path2svg}review-all-burns{$name-suffix}.svg"
@@ -296,7 +375,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         </xsl:when>
         <xsl:when test="$c:directive='=&lt;'">
 <xsl:text/>select-by-id:<xsl:value-of
-       select="$c:id"/>;object-rotate-90-ccw;page-fit-to-selection;select-clear;
+       select="$c:id"/>;object-rotate-90-ccw;page-fit-to-selectio'n;select-clear;
 <xsl:text/>
         </xsl:when>
         <xsl:when test="$c:directive=('=v','=V')">
@@ -327,10 +406,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 <xsl:text/>export-filename:<xsl:value-of
              select='concat($path2svg,$c:id,$name-suffix,".svg")'/>;export-do;
 <xsl:text/>
-<xsl:text/>export-filename:<xsl:value-of
+<xsl:text/>export-dpi:300;export-filename:<xsl:value-of
              select='concat($path2png,$c:id,$name-suffix,".png")'/>;export-do;
 <xsl:text/>
-<xsl:text/>export-filename:<xsl:value-of
+<xsl:text/>export-dpi:300;export-filename:<xsl:value-of
              select='concat($path2pdf,$c:id,$name-suffix,".pdf")'/>;export-do;
 <xsl:text/>
 
@@ -339,7 +418,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <!--put out the script that invokes inkscape to the standard output-->
   <xsl:for-each select="key('c:assemble','__all__',$c:top)">
     <xsl:variable name="c:id" select="tokenize(@inkscape:label,'\s+')[1]"/>
-echo Remaining files to be processed: <xsl:value-of select="last()-position()+1"/>
+echo "<xsl:value-of select="$c:id"/>" - remaining: <xsl:value-of select="last()-position()+1"/>
 inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
         " --actions-file=""",(: --batch-process slows things down a lot!:)
         $path2svg,$c:id,$name-suffix,".svg.txt""&#xa;")'/>
@@ -465,7 +544,8 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
     </xsl:when>
     <xsl:otherwise>
       <xsl:attribute name="style"
-            select="replace(.,'stroke-width:[^;]*;?','stroke-width:.001in;')"/>
+      select="replace(.,'stroke-width:[^;]*;?',
+                    concat('stroke-width:',c:lengthInDefault('.001in'),';'))"/>
     </xsl:otherwise>
   </xsl:choose>  
 </xsl:template>
@@ -516,16 +596,106 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
 <xsl:function name="c:labelPath" as="xsd:string">
   <xsl:param name="c:context" as="element()"/>
   <xsl:value-of>
-    <xsl:for-each select="($c:context/ancestor-or-self::*[@inkscape:label])">
+    <xsl:for-each select="($c:context/ancestor-or-self::*)">
       <xsl:text>&#xa;</xsl:text>
       <xsl:for-each select="1 to position()">
         <xsl:text>  </xsl:text>
       </xsl:for-each>
-      <xsl:text/>"<xsl:value-of select="@inkscape:label"/>"<xsl:text/>
+      <xsl:variable name="c:ref" select="(@inkscape:label,@id)[1]"/>
+      <xsl:text/>"<xsl:value-of select="$c:ref"/>"<xsl:text/>
+      <xsl:if test="preceding-sibling::*[(@inkscape:label,@id)[1]=$c:ref]">
+        <xsl:text/>[<xsl:value-of select="count(preceding-sibling::*
+                [(@inkscape:label,@id)[1]=$c:ref]) + 1"/>]<xsl:text/>
+      </xsl:if>
       <xsl:for-each select="@id">{<xsl:value-of select="."/>}</xsl:for-each>
       <xsl:if test="position()!=last()">/</xsl:if>
     </xsl:for-each>
   </xsl:value-of>
+</xsl:function>
+
+<xs:function>
+  <para>
+    Convert a length specification '\d+\w* into a specific number of inches.
+  </para>
+  <xs:param name="c:length">
+    <para>The string being converted</para>
+  </xs:param>
+</xs:function>
+<xsl:function name="c:lengthInInchesDefaultPX" as="xsd:decimal?">
+  <xsl:param name="c:length" as="xsd:string"/>
+  <xsl:sequence select="c:lengthInInchesWithDefault($c:length,1 div 96)"/>
+</xsl:function>
+
+<xs:function>
+  <para>
+    Convert a length specification '\d+\w* into a specific number of inches.
+  </para>
+  <xs:param name="c:length">
+    <para>The string being converted</para>
+  </xs:param>
+</xs:function>
+<xsl:function name="c:lengthInInches" as="xsd:decimal?">
+  <xsl:param name="c:length" as="xsd:string?"/>
+  <xsl:sequence
+             select="c:lengthInInchesWithDefault($c:length,$c:nonUnitInches)"/>
+</xsl:function>
+
+<xs:function>
+  <para>
+    Convert a length specification '\d+\w* into a specific number of inches.
+  </para>
+  <xs:param name="c:length">
+    <para>The string being converted</para>
+  </xs:param>
+  <xs:param name="c:defaultConversionToInches">
+    <para>The conversion to use as default when no units specified</para>
+  </xs:param>
+</xs:function>
+<xsl:function name="c:lengthInInchesWithDefault" as="xsd:decimal?">
+  <xsl:param name="c:length" as="xsd:string?"/>
+  <xsl:param name="c:defaultConversionToInches" as="xsd:decimal"/>
+  <xsl:for-each select="normalize-space($c:length)">
+    <xsl:variable name="c:amount" 
+             select="replace(.,'([\d\.\-]+)(\w+)?','$1') cast as xsd:decimal"/>
+    <xsl:variable name="c:units" 
+             select="replace(.,'([\d\.\-]+)(\w+)?','$2')"/>
+    <xsl:variable name="c:normalizedWidthInchesFactor"
+                  select="if( $c:units='' )   then $c:defaultConversionToInches
+                     else if( $c:units='px' ) then 1 div 96
+                     else if( $c:units='pt' ) then 1 div 72
+                     else if( $c:units='pc' ) then 1 div 6
+                     else if( $c:units='mm' ) then 1 div 25.4
+                     else if( $c:units='cm' ) then 1 div 2.54 else 1"/> 
+    <xsl:sequence select="$c:amount * $c:normalizedWidthInchesFactor"/>
+  </xsl:for-each>
+</xsl:function>
+
+<xs:function>
+  <para>
+    Convert a length specification '\d+\w* into a specific number of units
+    of default size.
+  </para>
+  <xs:param name="c:length">
+    <para>The string being converted</para>
+  </xs:param>
+</xs:function>
+<xsl:function name="c:lengthInDefault" as="xsd:decimal?">
+  <xsl:param name="c:length" as="xsd:string?"/>
+  <xsl:for-each select="normalize-space($c:length)">
+    <xsl:variable name="c:amount" 
+             select="replace(.,'([\d\.\-]+)(\w+)?','$1') cast as xsd:decimal"/>
+    <xsl:variable name="c:units" 
+             select="replace(.,'([\d\.\-]+)(\w+)?','$2')"/>
+    <xsl:variable name="c:normalizedWidthDefaultFactor"
+            select="if( $c:units='' )   then 1
+               else if( $c:units='px' ) then $c:nonUnitInches * 96
+               else if( $c:units='pt' ) then $c:nonUnitInches * 72
+               else if( $c:units='pc' ) then $c:nonUnitInches * 6
+               else if( $c:units='mm' ) then $c:nonUnitInches * 25.4
+               else if( $c:units='cm' ) then $c:nonUnitInches * 2.54
+                                        else $c:nonUnitInches"/> 
+    <xsl:sequence select="$c:amount div $c:normalizedWidthDefaultFactor"/>
+  </xsl:for-each>
 </xsl:function>
 
 </xsl:stylesheet>
