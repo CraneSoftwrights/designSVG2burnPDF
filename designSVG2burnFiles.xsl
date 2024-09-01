@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="US-ASCII"?>
-<?xml-stylesheet type="text/xsl" href="../utilities/xslstyle/xslstyle-docbook.xsl"?>
+<?xml-stylesheet type="text/xsl" href="utilities/xslstyle/xslstyle-docbook.xsl"?>
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
                 xmlns:xs="http://www.CraneSoftwrights.com/ns/xslstyle"
                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"
@@ -11,8 +11,7 @@
                 xpath-default-namespace="http://www.w3.org/2000/svg"
                 version="2.0">
 
-<xs:doc info="$Id$"
-        filename="review2burn.xsl" vocabulary="DocBook">
+<xs:doc info="" filename="designSVG2burnFiles.xsl" vocabulary="DocBook">
   <xs:title>Burst a Crane SVG design file into individual SVG burn files</xs:title>
   <para>
     This stylesheet is taking a collection of sets of layers and creating
