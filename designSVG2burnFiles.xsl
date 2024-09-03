@@ -462,6 +462,22 @@ if [ ! -d "pdf/<xsl:value-of select="."/>" ]; then mkdir "pdf/<xsl:value-of
     </xsl:for-each>
   </xsl:for-each>
   
+  <!--create the README files for each directory-->
+  <xsl:for-each select="$c:output/ancestor-or-self::*[c:isAdirectory(.)]">
+    <xsl:variable name="c:directory"
+              select="tokenize(@inkscape:label,'\s+')[normalize-space(.)][1]"/>
+    <xsl:variable name="c:content"
+    select="translate(substring-after(@inkscape:label,$c:directory),'''','')"/>
+    <xsl:variable name="c:content" select="replace($c:content,'^\s+','')"/>
+    
+echo >svg/<xsl:value-of select="c:getPath(.)"/>README.txt '<xsl:value-of select="
+  $c:content"/>'
+echo >png/<xsl:value-of select="c:getPath(.)"/>README.txt '<xsl:value-of select="
+  $c:content"/>'
+echo >pdf/<xsl:value-of select="c:getPath(.)"/>README.txt '<xsl:value-of select="
+  $c:content"/>'
+  </xsl:for-each>
+  
   <!--now invoke Inkscape with the script put aside for the SVG file-->
   <xsl:for-each select="$c:output">
     <xsl:variable name="c:path" select="c:getPath(.)"/>
@@ -654,6 +670,22 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:path,$c:id,$name-suffix,
 
 <xs:function>
   <para>
+    Return the indication of the given Inkscape construct specifying
+    a directory
+  </para>
+  <xs:param name="c:node">
+    <para>Where to look from</para>
+  </xs:param>
+</xs:function>
+<xsl:function name="c:isAdirectory" as="xsd:boolean">
+  <xsl:param name="c:node" as="node()"/>
+  <xsl:sequence select="exists($c:node
+                        [tokenize(@inkscape:label,'\s+')[normalize-space(.)][1]
+                         [ends-with(.,'/')]])"/>
+</xsl:function>
+
+<xs:function>
+  <para>
     Return the path inferred by ancestral Inkscape labels that end with "/"
   </para>
   <xs:param name="c:node">
@@ -662,10 +694,9 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:path,$c:id,$name-suffix,
 </xs:function>
 <xsl:function name="c:getPath" as="xsd:string">
   <xsl:param name="c:node" as="node()"/>
-    <xsl:sequence select="string-join(
-    $c:node/ancestor::*[tokenize(@inkscape:label,'\s+')[normalize-space(.)][1]
-                        [ends-with(.,'/')]]/
-            tokenize(@inkscape:label,'\s+')[normalize-space(.)][1],'')"/>
+  <xsl:sequence select="
+                  string-join($c:node/ancestor-or-self::*[c:isAdirectory(.)]/
+                  tokenize(@inkscape:label,'\s+')[normalize-space(.)][1],'')"/>
 </xsl:function>
 
 <xs:function>
