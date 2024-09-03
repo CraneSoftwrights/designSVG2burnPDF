@@ -436,21 +436,33 @@ matrix(-0.10215694,0.10215694,-0.10214641,-0.10214641,282.66397,204.85245)')"/>
   <!--put out the script that invokes inkscape to the standard output-->
 echo Number of outputs being created: <xsl:value-of select="count($c:output)"/>
 
-  <!--need to create directories to get started-->
+  <!--need to create directories to get started; first determine full paths-->
   <xsl:variable name="c:directories" as="xsd:string*">
     <xsl:for-each select="$c:output">
       <xsl:sequence select="c:getPath(.)"/>
     </xsl:for-each>
   </xsl:variable>
+  
+  <!--next build up any needed subdirectories in a piecemail fashion-->
   <xsl:for-each select="distinct-values($c:directories)">
+    <xsl:variable name="c:steps" select="tokenize(.,'/')[normalize-space(.)]"/>
+    <xsl:for-each select="$c:steps">
+      <xsl:variable name="c:thisPos" select="position()"/>
+      <xsl:for-each select="
+                         string-join($c:steps[position()&lt;=$c:thisPos],'/')">
+
 if [ ! -d "svg/<xsl:value-of select="."/>" ]; then mkdir "svg/<xsl:value-of
                                                              select="."/>" ; fi 
 if [ ! -d "png/<xsl:value-of select="."/>" ]; then mkdir "png/<xsl:value-of
                                                              select="."/>" ; fi 
 if [ ! -d "pdf/<xsl:value-of select="."/>" ]; then mkdir "pdf/<xsl:value-of
-                                                             select="."/>" ; fi 
+                                                             select="."/>" ; fi
+        
+      </xsl:for-each>
+    </xsl:for-each>
   </xsl:for-each>
   
+  <!--now invoke Inkscape with the script put aside for the SVG file-->
   <xsl:for-each select="$c:output">
     <xsl:variable name="c:path" select="c:getPath(.)"/>
     <xsl:variable name="c:id" select="tokenize(@inkscape:label,'\s+')[1]"/>
@@ -651,8 +663,9 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:path,$c:id,$name-suffix,
 <xsl:function name="c:getPath" as="xsd:string">
   <xsl:param name="c:node" as="node()"/>
     <xsl:sequence select="string-join(
-    $c:node/ancestor::*[ends-with(normalize-space(@inkscape:label),'/')]/
-                                  normalize-space(@inkscape:label),'')"/>
+    $c:node/ancestor::*[tokenize(@inkscape:label,'\s+')[normalize-space(.)][1]
+                        [ends-with(.,'/')]]/
+            tokenize(@inkscape:label,'\s+')[normalize-space(.)][1],'')"/>
 </xsl:function>
 
 <xs:function>
