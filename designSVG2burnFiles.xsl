@@ -318,9 +318,10 @@ matrix(-0.10215694,0.10215694,-0.10214641,-0.10214641,282.66397,204.85245)')"/>
                select="c:disambiguateTokens(tokenize(@inkscape:label,'\s+'))"/>
     <!--act on the disambiguated references; initial tokens should be same-->
     <xsl:variable name="c:id" select="$c:tokens[1]"/>
+    <xsl:variable name="c:path" select="c:getPath(.)"/>
     <xsl:variable name="c:directive" select="$c:tokens[2]"/>
     <!--create the SVG file for the target layer-->
-    <xsl:result-document href="{$path2svg}{$c:id}{$name-suffix}.svg"
+    <xsl:result-document href="{$path2svg}{$c:path}{$c:id}{$name-suffix}.svg"
                          method="xml" indent="no">
       <xsl:for-each select="$c:top/*">
         <xsl:copy>
@@ -348,8 +349,8 @@ matrix(-0.10215694,0.10215694,-0.10214641,-0.10214641,282.66397,204.85245)')"/>
     <!--======================================================-->
 
     <!--create the Inkscape actions file for the target layer-->
-    <xsl:result-document href="{$path2svg}{$c:id}{$name-suffix}.svg.txt"
-                         method="text">
+    <xsl:result-document method="text"
+                      href="{$path2svg}{$c:path}{$c:id}{$name-suffix}.svg.txt">
 <xsl:text/>select-by-id:<xsl:value-of 
                                   select="$c:id"/>
       <xsl:text>;object-to-path;select-clear;
@@ -418,13 +419,13 @@ matrix(-0.10215694,0.10215694,-0.10214641,-0.10214641,282.66397,204.85245)')"/>
         </xsl:otherwise>
       </xsl:choose>
 <xsl:text/>export-filename:<xsl:value-of
-             select='concat($path2svg,$c:id,$name-suffix,".svg")'/>;export-do;
+      select='concat($path2svg,$c:path,$c:id,$name-suffix,".svg")'/>;export-do;
 <xsl:text/>
 <xsl:text/>export-dpi:300;export-filename:<xsl:value-of
-             select='concat($path2png,$c:id,$name-suffix,".png")'/>;export-do;
+      select='concat($path2png,$c:path,$c:id,$name-suffix,".png")'/>;export-do;
 <xsl:text/>
 <xsl:text/>export-dpi:300;export-filename:<xsl:value-of
-             select='concat($path2pdf,$c:id,$name-suffix,".pdf")'/>;export-do;
+      select='concat($path2pdf,$c:path,$c:id,$name-suffix,".pdf")'/>;export-do;
 <xsl:text/>
 
     </xsl:result-document>
@@ -434,12 +435,31 @@ matrix(-0.10215694,0.10215694,-0.10214641,-0.10214641,282.66397,204.85245)')"/>
   
   <!--put out the script that invokes inkscape to the standard output-->
 echo Number of outputs being created: <xsl:value-of select="count($c:output)"/>
+
+  <!--need to create directories to get started-->
+  <xsl:variable name="c:directories" as="xsd:string*">
+    <xsl:for-each select="$c:output">
+      <xsl:sequence select="c:getPath(.)"/>
+    </xsl:for-each>
+  </xsl:variable>
+  <xsl:for-each select="distinct-values($c:directories)">
+if [ ! -d "svg/<xsl:value-of select="."/>" ]; then mkdir "svg/<xsl:value-of
+                                                             select="."/>" ; fi 
+if [ ! -d "png/<xsl:value-of select="."/>" ]; then mkdir "png/<xsl:value-of
+                                                             select="."/>" ; fi 
+if [ ! -d "pdf/<xsl:value-of select="."/>" ]; then mkdir "pdf/<xsl:value-of
+                                                             select="."/>" ; fi 
+  </xsl:for-each>
+  
   <xsl:for-each select="$c:output">
+    <xsl:variable name="c:path" select="c:getPath(.)"/>
     <xsl:variable name="c:id" select="tokenize(@inkscape:label,'\s+')[1]"/>
-echo "<xsl:value-of select="$c:id"/>" - remaining: <xsl:value-of select="last()-position()"/>
-inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
+echo "<xsl:value-of select="concat($c:path,$c:id)"/>" - remaining: <xsl:text/>
+    <xsl:value-of select="last()-position()"/>
+inkscape "<xsl:value-of select='concat($path2svg,$c:path,$c:id,$name-suffix,
+        ".svg""",
         " --actions-file=""",(: --batch-process slows things down a lot!:)
-        $path2svg,$c:id,$name-suffix,".svg.txt""&#xa;")'/>
+        $path2svg,$c:path,$c:id,$name-suffix,".svg.txt""&#xa;")'/>
   </xsl:for-each>
 </xsl:template>
   
@@ -619,6 +639,21 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
 <xs:doc>
   <xs:title>Utility functions and arithmetic</xs:title>
 </xs:doc>
+
+<xs:function>
+  <para>
+    Return the path inferred by ancestral Inkscape labels that end with "/"
+  </para>
+  <xs:param name="c:node">
+    <para>Where to look from</para>
+  </xs:param>
+</xs:function>
+<xsl:function name="c:getPath" as="xsd:string">
+  <xsl:param name="c:node" as="node()"/>
+    <xsl:sequence select="string-join(
+    $c:node/ancestor::*[ends-with(normalize-space(@inkscape:label),'/')]/
+                                  normalize-space(@inkscape:label),'')"/>
+</xsl:function>
 
 <xs:function>
   <para>Report the hierarchy of labels including and above the given</para>
