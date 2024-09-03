@@ -279,6 +279,7 @@ matrix(-0.10215694,0.10215694,-0.10214641,-0.10214641,282.66397,204.85245)')"/>
   </xsl:if>
   
   <!--======================================================-->
+  <xsl:variable name="c:output" select="key('c:assemble','__all__',$c:top)"/>
 
   <!--create review SVG file of all layers-->
   <xsl:result-document href="{$path2svg}review-all-burns{$name-suffix}.svg"
@@ -310,7 +311,7 @@ matrix(-0.10215694,0.10215694,-0.10214641,-0.10214641,282.66397,204.85245)')"/>
   <!--======================================================-->
 
   <!--create individual SVG files for each layer-->
-  <xsl:for-each select="key('c:assemble','__all__',$c:top)">
+  <xsl:for-each select="$c:output">
     <xsl:variable name="c:thisAssembly" select="."/>
     <!--determine (and assume) umique identifier for each-->
     <xsl:variable name="c:tokens" 
@@ -321,7 +322,7 @@ matrix(-0.10215694,0.10215694,-0.10214641,-0.10214641,282.66397,204.85245)')"/>
     <!--create the SVG file for the target layer-->
     <xsl:result-document href="{$path2svg}{$c:id}{$name-suffix}.svg"
                          method="xml" indent="no">
-      <xsl:for-each select="/*">
+      <xsl:for-each select="$c:top/*">
         <xsl:copy>
           <!--preserve document element-->
           <xsl:copy-of select="@*"/>
@@ -333,8 +334,8 @@ matrix(-0.10215694,0.10215694,-0.10214641,-0.10214641,282.66397,204.85245)')"/>
               <xsl:copy-of select="@*"/>
               <xsl:attribute name="id" select="$c:id"/>
               <xsl:attribute name="style"
-                             select="'display:inline;',
-                                     replace(@style,'display:.+?;?','')"/>
+                             select="concat('display:inline;',
+                                       replace(@style,'display:[^;]+;?',''))"/>
               <xsl:call-template name="c:addReferencedLayers">
                 <xsl:with-param name="c:layer" select="."/>
               </xsl:call-template>
@@ -432,7 +433,8 @@ matrix(-0.10215694,0.10215694,-0.10214641,-0.10214641,282.66397,204.85245)')"/>
   <!--======================================================-->
   
   <!--put out the script that invokes inkscape to the standard output-->
-  <xsl:for-each select="key('c:assemble','__all__',$c:top)">
+echo Number of outputs being created: <xsl:value-of select="count($c:output)"/>
+  <xsl:for-each select="$c:output">
     <xsl:variable name="c:id" select="tokenize(@inkscape:label,'\s+')[1]"/>
 echo "<xsl:value-of select="$c:id"/>" - remaining: <xsl:value-of select="last()-position()"/>
 inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
@@ -538,8 +540,8 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:id,$name-suffix,".svg""",
               <xsl:copy>
                 <xsl:copy-of select="@*"/>
                 <xsl:attribute name="style"
-                               select="'display:inline;',
-                                       replace(@style,'display:.+?;?','')"/>
+                               select="concat('display:inline;',
+                                       replace(@style,'display:[^;]+;?',''))"/>
                 <xsl:apply-templates/>
               </xsl:copy>
             </xsl:for-each>
