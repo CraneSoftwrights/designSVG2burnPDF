@@ -11,20 +11,22 @@
                 xpath-default-namespace="http://www.w3.org/2000/svg"
                 version="2.0">
 
+<xsl:import href="commonDesignSVG.xsl"/>
+
 <xs:doc info="" filename="designSVG2burnFiles.xsl" vocabulary="DocBook">
   <xs:title>Burst a Crane SVG design file into individual SVG burn files</xs:title>
   <para>
     This stylesheet is taking a collection of sets of layers and creating
     individual SVG files with only the layers in the given set. At the same
-    time, any strokes that are magenta in colour are indicated to have a stroke
-    width of 0.001in for the cutter to recognize as a cut instead of an etch.
+    time, any strokes that are magenta in colour are indicated to have a
+    specified stroke width for the cutter to recognize as a cut, not an etch.
     A set of Inkscape action files is created and the invocation of Inkscape
     for these files.
   </para>
   <programlisting>
 BSD 3-Clause License
 
-Copyright (c) 2023, Crane Softwrights Ltd.
+Copyright (c) 2024, Crane Softwrights Ltd.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -100,7 +102,29 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     The colour assumed to be modified into a cutting stroke.
   </para>
 </xs:param>
-<xsl:param name="cut-colour" as="xsd:string" select="'ff00ff'"/>
+<xsl:param name="cut-colour" as="xsd:string" required="yes"/>
+
+<xs:param>
+  <para>
+    The width to use for a cutting stroke.
+  </para>
+</xs:param>
+<xsl:param name="cut-width" as="xsd:string" required="yes"/>
+
+<xs:param>
+  <para>
+    The minimum width allowed for a stroke, lower of which are elided.
+  </para>
+</xs:param>
+<xsl:param name="minimum-stroke-width" as="xsd:string" required="yes"/>
+
+<xs:variable>
+  <para>
+    The minimum stroke width for comparison purposes
+  </para>
+</xs:variable>
+<xsl:variable name="c:minimumStrokeWidthInInches" as="xsd:double"
+              select="c:lengthInInchesDefaultPX($minimum-stroke-width)"/>
 
 <xs:variable>
   <para>Need to remember the input context for key() to work</para>
@@ -146,21 +170,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <para>All ids</para>
 </xs:key>
 <xsl:key name="c:objectsById" match="*[@id]" use="normalize-space(@id)"/>
-
-<xs:variable>
-  <para>
-    Determine in inches the unit of measure of non-unit-specified values
-  </para>
-</xs:variable>
-<xsl:variable name="c:nonUnitInches" as="xsd:double">
-  <xsl:variable name="c:pageWidthInInches" as="xsd:double"
-                select="c:lengthInInchesDefaultPX(/svg/@width)"/>
-  <xsl:variable name="c:viewWidth" as="xsd:double"
-                select="for $c:width in replace(/svg/@viewBox,
-                    '\s*([-.\d]+)\s*([-.\d]+)\s*([-.\d]+)\s*([-.\d]+)\s*','$3')
-                        return $c:width cast as xsd:double"/>
-  <xsl:sequence select="$c:pageWidthInInches div $c:viewWidth"/>
-</xsl:variable>
 
 <xs:template>
   <para>
@@ -217,6 +226,20 @@ matrix(-0.10215694,0.10215694,-0.10214641,-0.10214641,282.66397,204.85245)')"/>
        string-join( key('c:objectsByLabel','Version')/c:labelPath(.), '; ' )"/>
     </xsl:if>
     
+    <!--check the arguments for stroke widths-->
+    <xsl:if test="not(replace($minimum-stroke-width,'([\d\.\-]+)(\w+)?','$1')
+                        castable as xsd:double)">
+      <xsl:value-of select="concat('Specified minimum stroke width ''',
+                                   $minimum-stroke-width,
+                                   ''' is not a number followed by a unit')"/>
+    </xsl:if>
+    <xsl:if test="not(replace($cut-width,'([\d\.\-]+)(\w+)?','$1')
+                        castable as xsd:double)">
+      <xsl:value-of select="concat('Specified cutting stroke width ''',
+                                   $cut-width,
+                                   ''' is not a number followed by a unit')"/>
+    </xsl:if>
+    
     <!--If no or multiple ids being referenced, cannot guess which to use-->
     <xsl:for-each select="key('c:assemble','__all__',$c:top)">
       <xsl:variable name="c:refs" select="tokenize(@inkscape:label,'\s+')"/>
@@ -227,20 +250,26 @@ matrix(-0.10215694,0.10215694,-0.10214641,-0.10214641,282.66397,204.85245)')"/>
     </xsl:for-each>
   
     <!--check anything close to burn size that isn't expressly cut colour-->
-    <xsl:for-each select="//*[contains(@style,'stroke-width')]
-                             [not(contains(@style,'stroke:none'))] except
-                (//*[contains(@style,'display:none')]/(.,.//*), //defs//*)">
+    <xsl:variable name="c:checkStrokes"
+                  select="(//*[contains(@style,'stroke-width')]
+                              [not(contains(@style,'stroke:none'))]) except (//defs//*)"/>
+    <xsl:for-each select="$c:checkStrokes">
       <xsl:variable name="c:strokeColour"
-            select="replace(@style,'.*?stroke:#(.+?);?.*','$1')"/>
+          select="if( contains( @style, 'stroke:#' ) )
+                  then replace(@style,'.*?stroke:#([^;]*);?.*','$1') else ''"/>
       <xsl:variable name="c:strokeWidth" 
-           select="replace(@style,'.*?stroke-width:([\d\.\-]+\w*);?.*','$1')"/>
+         select="replace(@style,'^.*?stroke-width:([\d\.\-]+\w*);?.*$','$1')"/>
+      <xsl:variable name="c:strokeWidthLength" 
+         select="replace(@style,'^.*?stroke-width:([\d\.\-]+)\w*;?.*$','$1')"/>
       <xsl:variable name="c:strokeWidthLength" 
            select="replace(@style,'.*?stroke-width:([\d\.\-]+)\w*;?.*','$1')"/>
       <xsl:variable name="c:normalizedWidthInInches"
-                    select="c:lengthInInches($c:strokeWidth)"/>
+                    select="c:lengthInInches($c:strokeWidthLength)"/>
+      <xsl:variable name="c:scale"
+                    select="c:determineStrokeScalingFactor(@transform)"/>
       <xsl:variable name="c:scaledWidthInInches"
-                    select="c:determineStrokeScalingFactor(@transform) *
-                            $c:normalizedWidthInInches"/>
+                select="round( $c:normalizedWidthInInches * $c:scale * 100000 )
+                        div 100000"/>
       
       <xsl:choose>
         <xsl:when test="not( $c:strokeWidthLength castable as xsd:double )">
@@ -248,20 +277,21 @@ matrix(-0.10215694,0.10215694,-0.10214641,-0.10214641,282.66397,204.85245)')"/>
                                        $c:strokeWidth,''' ',
                                        c:labelPath(.),' = ',$c:strokeWidth)"/>
         </xsl:when>
-        <xsl:when test="$c:scaledWidthInInches &lt; .00005">
-          <!--don't treat as a problem; the stroke isn't visible-->
-        </xsl:when>
         <xsl:when test="$c:strokeColour = $cut-colour">
           <!--don't treat as a problem; the stroke will get converted-->
         </xsl:when>
+        <xsl:when test="$c:scaledWidthInInches = 0">
+          <!--special case; leave zeroes alone-->
+        </xsl:when>
         <xsl:otherwise>
-          <xsl:if test="$c:scaledWidthInInches &lt; .003 and
-                        $c:strokeColour != $cut-colour">
+          <xsl:if test="$c:scaledWidthInInches&lt;$c:minimumStrokeWidthInInches
+                    and $c:strokeColour != $cut-colour">
             <xsl:value-of>
               <xsl:value-of select="'Rogue cutting stroke detected at',
-                                    $c:scaledWidthInInches,'inches',
+                                    $c:scaledWidthInInches,'inches (min',
+                                    $c:minimumStrokeWidthInInches,' inches)',
                                     c:labelPath(.),'=',$c:strokeWidth,
-                                    @transform,'colour',
+                                    string(@transform),'colour',
                                     $c:strokeColour"/>
             </xsl:value-of>
           </xsl:if>
@@ -631,7 +661,8 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:path,$c:id,$name-suffix,
 
 <xs:template>
   <para>
-    Convert magenta lines to .001in, but only when creating burn, not review
+    Convert cut-colour lines to cut-width, but only when creating burn, not
+    when reviewing content
   </para>
   <xs:param name="c:review">
     <para>Indication that a review copy is being created</para>
@@ -646,7 +677,7 @@ inkscape "<xsl:value-of select='concat($path2svg,$c:path,$c:id,$name-suffix,
     <xsl:otherwise>
       <xsl:attribute name="style"
       select="replace(.,'stroke-width:[^;]*;?',
-                    concat('stroke-width:',c:lengthInDefault('.001in'),';'))"/>
+                  concat('stroke-width:',c:lengthInDefault($cut-width),';'))"/>
     </xsl:otherwise>
   </xsl:choose>  
 </xsl:template>

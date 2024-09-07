@@ -10,3 +10,5 @@ exit 1
 fi
 java -jar utilities/saxon655/saxon.jar -a -o designSVG2burnFiles.html designSVG2burnFiles.xsl
 open designSVG2burnFiles.html
+java -jar utilities/saxon655/saxon.jar -a -o convertBadStrokes4designSVG.html convertBadStrokes4designSVG.xsl
+open convertBadStrokes4designSVG.html
