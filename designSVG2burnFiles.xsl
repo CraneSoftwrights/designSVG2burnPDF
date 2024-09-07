@@ -516,7 +516,7 @@ echo "<xsl:value-of select="concat($c:path,$c:id)"/>" - remaining: <xsl:text/>
     <xsl:value-of select="last()-position()"/>
 inkscape "<xsl:value-of select='concat($path2svg,$c:path,$c:id,$name-suffix,
         ".svg""",
-        " --actions-file=""",(: --batch-process slows things down a lot!:)
+        " --batch-process --actions-file=""",
         $path2svg,$c:path,$c:id,$name-suffix,".svg.txt""&#xa;")'/>
   </xsl:for-each>
 </xsl:template>
