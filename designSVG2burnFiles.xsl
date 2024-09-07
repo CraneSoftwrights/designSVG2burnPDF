@@ -465,6 +465,7 @@ matrix(-0.10215694,0.10215694,-0.10214641,-0.10214641,282.66397,204.85245)')"/>
   
   <!--put out the script that invokes inkscape to the standard output-->
 echo Number of outputs being created: <xsl:value-of select="count($c:output)"/>
+echo Inkscape version: `inkscape --version`<xsl:text/>
 
   <!--need to create directories to get started; first determine full paths-->
   <xsl:variable name="c:directories" as="xsd:string*">
