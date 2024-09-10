@@ -155,6 +155,22 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 <xs:function>
   <para>
+    Determine a scaling factor from all contributors to scaling found in
+    an element's ancestors.
+  </para>
+  <xs:param name="c:node">
+    <para>Where to start looking for ancestors</para>
+  </xs:param>
+</xs:function>
+<xsl:function name="c:determineAncestralStrokeScalingFactor" as="xsd:double">
+  <xsl:param name="c:node" as="node()?"/>
+
+  <xsl:sequence select="c:product($c:node/ancestor-or-self::*[@transform]/
+                                 c:determineStrokeScalingFactor(@transform))"/>
+</xsl:function>
+
+<xs:function>
+  <para>
     Calculate the product of a sequence of numbers
   </para>
   <xs:param name="c:seq">

@@ -165,7 +165,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <xsl:variable name="c:normalizedWidthInInches"
                 select="c:lengthInInches($c:strokeWidthLength)"/>
   <xsl:variable name="c:scale"
-                select="c:determineStrokeScalingFactor(@transform)"/>
+                select="c:determineAncestralStrokeScalingFactor(.)"/>
   <xsl:variable name="c:scaledWidthInInches"
                 select="round( $c:normalizedWidthInInches * $c:scale * 100000 )
                         div 100000"/>
@@ -207,7 +207,9 @@ else round(($c:minimumStrokeWidthInInches div $c:scale) * 100000) div 100000"/>
                                 c:labelPath(.),' old =',$c:strokeWidth,
                                 '=',$c:normalizedWidthInInches,'inches;',
                                 'less than',$c:scaledMinimumWidthInInches,
-                                'inches transform =',string(@transform),
+                                'inches scale',$c:scale,
+                                (ancestor-or-self::*[@transform]/@transform/
+                            (string(.),'=',c:determineStrokeScalingFactor(.))),
                                 '@',$c:scale,'=',$c:scaledWidthInInches,
                                 'colour',$c:strokeColour,'new:',$c:newStyle"/>
       </xsl:when>
