@@ -9,6 +9,20 @@ echo https://sourceforge.net/projects/saxon/files/saxon6/6.5.5/
 exit 1
 fi
 java -jar utilities/saxon655/saxon.jar -a -o designSVG2burnFiles.html designSVG2burnFiles.xsl
-open designSVG2burnFiles.html
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+if grep -q -i "inconsistencies.detected" designSVG2burnFiles.html; then
+  echo "Error: The file designSVG2burnFiles.html contains inconsistencies."
+  exit 1
+fi
 java -jar utilities/saxon655/saxon.jar -a -o convertBadStrokes4designSVG.html convertBadStrokes4designSVG.xsl
-open convertBadStrokes4designSVG.html
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+if grep -q -i "inconsistencies.detected" convertBadStrokes4designSVG.html; then
+  echo "Error: The file convertBadStrokes4designSVG.html contains inconsistencies."
+  exit 1
+fi
+
+echo Documentation created successfully
