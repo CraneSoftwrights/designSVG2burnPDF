@@ -10,27 +10,32 @@ exit 1
 fi
 
 rm designSVG2burnFiles.html
+rm convertBadStrokes4designSVG.html
+
 java -jar utilities/saxon655/saxon.jar -a -o designSVG2burnFiles.html designSVG2burnFiles.xsl
 if [ $? -ne 0 ]; then
+  echo Problem executing Saxon
   exit 1
 fi
 if [ ! -f designSVG2burnFiles.html ]; then
   echo "Error: Documentation not produced
 fi
-if grep -q -i "inconsistencies.detected" designSVG2burnFiles.html; then
+grep -q -i "inconsistencies.detected" designSVG2burnFiles.html
+if [ $? -ne 0 ]; then
   echo "Error: The file designSVG2burnFiles.html contains inconsistencies."
   exit 1
 fi
 
-rm convertBadStrokes4designSVG.html
 java -jar utilities/saxon655/saxon.jar -a -o convertBadStrokes4designSVG.html convertBadStrokes4designSVG.xsl
 if [ $? -ne 0 ]; then
+  echo Problem executing Saxon
   exit 1
 fi
 if [ ! -f convertBadStrokes4designSVG.html ]; then
   echo "Error: Documentation not produced
 fi
-if grep -q -i "inconsistencies.detected" convertBadStrokes4designSVG.html; then
+grep -q -i "inconsistencies.detected" convertBadStrokes4designSVG.html
+if [ $? -ne 0 ]; then
   echo "Error: The file convertBadStrokes4designSVG.html contains inconsistencies."
   exit 1
 fi
