@@ -58,7 +58,7 @@ jobs:
           mkdir   download
           cp makedoc.log.txt download
           # compose README file
-          cp      shared/outputs-readme.txt \
+          cp      outputs-readme.txt \
                   download/README-crane-designSVG2burnFiles--${{ env.RELEASE_VERSION }}-${{ env.BRANCH_NAME }}-${{ env.COMMIT_HASH_SHORT }}.txt
           echo  >>download/README-crane-designSVG2burnFiles--${{ env.RELEASE_VERSION }}-${{ env.BRANCH_NAME }}-${{ env.COMMIT_HASH_SHORT }}.txt crane-designSVG2burnFiles--${{ env.RELEASE_VERSION }}-${{ env.BRANCH_NAME }}-${{ env.COMMIT_HASH_SHORT }}
           # package up everything except README
