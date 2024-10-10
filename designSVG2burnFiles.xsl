@@ -171,11 +171,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 </xs:key>
 <xsl:key name="c:objectsById" match="*[@id]" use="normalize-space(@id)"/>
 
-<xs:template>
+<xs:templatex>
   <para>
     Can't get started
   </para>
-</xs:template>
+</xs:templatex>
 <xsl:template match="/*">
   <xsl:message terminate="yes"
                select="'Unexpected input document element:',name(.)"/>
